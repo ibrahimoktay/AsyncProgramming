@@ -7,9 +7,13 @@
 //
 
 import Foundation
+import Combine
 
 protocol ImageService {
+    
     func search(_ query: String, _ completion: @escaping ([String]) -> Void)
+    
+    func search(_ query: String) -> AnyPublisher<[String], Never>
 }
 
 enum APIError: Error {
@@ -35,4 +39,14 @@ func call<T: Decodable>(_ request: URLRequest, _ completion: @escaping (Result<T
     }
     
     urlSession.resume()
+}
+
+
+func call<T: Decodable>(_ request: URLRequest) -> AnyPublisher<T, Error> {
+    let publisher = URLSession.shared.dataTaskPublisher(for: request)
+        .map{ $0.data }
+        .decode(type: T.self, decoder: JSONDecoder())
+        .eraseToAnyPublisher()
+    
+    return publisher
 }

@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Combine
 
 class ViewController: UIViewController {
     @IBOutlet weak var collectionView: UICollectionView!
@@ -14,6 +15,8 @@ class ViewController: UIViewController {
     let searchController = UISearchController(searchResultsController: nil)
     var viewModel: ViewModel!
     var imageUrls = [String]()
+    
+    var canceller: AnyCancellable?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -23,6 +26,10 @@ class ViewController: UIViewController {
         initSearchController()
         
         viewModel = ViewModel(services: [UnsplashAPI(), PexelsAPI()])
+        canceller = viewModel.$imageUrls.sink { urls in
+            self.imageUrls = urls
+            self.collectionView.reloadData()
+        }
     }
     
     private func initCollectionView() {
@@ -46,10 +53,11 @@ class ViewController: UIViewController {
 extension ViewController: UISearchResultsUpdating {
     
     func updateSearchResults(for searchController: UISearchController) {
-        viewModel.search(searchController.searchBar.text ?? "") { urls in
-            self.imageUrls = urls
-            self.collectionView.reloadData()
-        }
+//        viewModel.search(searchController.searchBar.text ?? "") { urls in
+//            self.imageUrls = urls
+//            self.collectionView.reloadData()
+//        }
+        viewModel.query = searchController.searchBar.text ?? ""
     }
 }
 

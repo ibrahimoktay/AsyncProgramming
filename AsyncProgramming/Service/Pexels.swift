@@ -7,9 +7,18 @@
 //
 
 import Foundation
+import Combine
 
 class PexelsAPI: ImageService {
+    
     var baseURL = "https://api.pexels.com"
+    
+    func getRequest(_ query: String) -> URLRequest {
+        let url = "\(baseURL)/v1/search?query=\(query)&page=1&per_page=10"
+        var request = URLRequest(url: URL(string: url)!)
+        request.addValue(Authorization.PEXELS_CLIENT_ID, forHTTPHeaderField: "Authorization")
+        return request
+    }
     
     func search(_ query: String, _ completion: @escaping ([String]) -> Void) {
         getImages(query) { response in
@@ -23,11 +32,20 @@ class PexelsAPI: ImageService {
         }
     }
     
+    func search(_ query: String) -> AnyPublisher<[String], Never> {
+        return getImages(query)
+            .map { response -> [String] in
+                return response.photos!.compactMap{ $0.src?.small }
+            }
+            .replaceError(with: [String]())
+            .eraseToAnyPublisher()
+    }
+    
     func getImages(_ query: String, _ completion: @escaping (Result<PexelsResponse, APIError>) -> Void) {
-        let url = "\(baseURL)/v1/search?query=\(query)&page=1&per_page=10"
-        var request = URLRequest(url: URL(string: url)!)
-        request.addValue(Authorization.PEXELS_CLIENT_ID, forHTTPHeaderField: "Authorization")
-        
-        call(request, completion)
+        call(getRequest(query), completion)
+    }
+    
+    func getImages(_ query: String) -> AnyPublisher<PexelsResponse, Error> {
+        return call(getRequest(query))
     }
 }

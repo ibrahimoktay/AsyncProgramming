@@ -8,47 +8,35 @@
 
 import Foundation
 import UIKit
+import Combine
 
 class ViewModel {
+    var cancellables = Set<AnyCancellable>()
     let services: [ImageService]!
-    var imageUrls = [String]()
     
-    var workItem: DispatchWorkItem?
-    var dispatchGroup: DispatchGroup!
-        
-    init(services: [ImageService]) {
-        self.services = services
-        self.dispatchGroup = DispatchGroup()
+    @Published var imageUrls = [String]()
+    @Published var query: String = ""
+    
+    var queryPublisher: AnyPublisher<String, Never> {
+        return $query
+            .filter{ $0.count > 3 }
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .eraseToAnyPublisher()
     }
     
-    func search(_ query: String, completion: @escaping ([String]) -> Void) {
-        guard query.count > 3 else {
-            completion([String]())
-            return
-        }
-        
-        workItem?.cancel()
-        imageUrls.removeAll()
-        workItem = DispatchWorkItem { [weak self] in
-            guard let self = self else {
-                return
+    init(services: [ImageService]) {
+        self.services = services
+        queryPublisher
+            .flatMap { queryString -> AnyPublisher<[[String]], Never> in
+                return Publishers.MergeMany(services.map{ $0.search(queryString) })
+                    .collect()
+                    .eraseToAnyPublisher()
             }
-            
-            for service in self.services {
-                self.dispatchGroup.enter()
-                service.search(query) { [weak self] urls in
-                    self?.imageUrls.append(contentsOf: urls)
-                    self?.dispatchGroup.leave()
-                }
+            .receive(on: RunLoop.main)
+            .sink { urls in
+                self.imageUrls = urls.flatMap{ $0 }
+//                print(urls)
             }
-            
-            self.dispatchGroup.notify(queue: .main) {
-                completion(self.imageUrls)
-            }
-        }
-        
-        if let workItem = workItem {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 1, execute: workItem)
-        }
+        .store(in: &cancellables)
     }
 }
