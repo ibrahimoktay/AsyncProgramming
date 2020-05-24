@@ -34,8 +34,12 @@ class PexelsAPI: ImageService {
     
     func search(_ query: String) -> AnyPublisher<[String], Never> {
         return getImages(query)
-            .map { response -> [String] in
-                return response.photos!.compactMap{ $0.src?.small }
+            .tryMap { response -> [String] in
+                let result = response.photos?.compactMap{ $0.src?.small }
+                guard result != nil else {
+                    throw APIError.noData
+                }
+                return result!
             }
             .replaceError(with: [String]())
             .eraseToAnyPublisher()

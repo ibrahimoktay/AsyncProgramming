@@ -34,8 +34,12 @@ class UnsplashAPI: ImageService {
     
     func search(_ query: String) -> AnyPublisher<[String], Never> {
         return getImages(query)
-            .map { response -> [String] in
-                return response.results!.compactMap{ $0.urls?.small }
+            .tryMap { response -> [String] in
+                let result = response.results?.compactMap{ $0.urls?.small }
+                guard result != nil else {
+                    throw APIError.noData
+                }
+                return result!
             }
             .replaceError(with: [String]())
             .eraseToAnyPublisher()
